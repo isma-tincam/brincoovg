@@ -57,11 +57,11 @@ const SCENES = {
             tints:['#ff4400','#ff8800','#ffcc44','#ff2200'], glow:'#ff6600' },
 };
 const CHAPTER_POOLS = [
-  ['space','void'],    // cap 0 — niveles 1-12
-  ['nebula','space'],  // cap 1
-  ['gd','nebula'],     // cap 2
-  ['void','lava'],     // cap 3
-  ['lava','gd'],       // cap 4+
+  ['gd','nebula','void','space'],   // cap 0 — todos los escenarios desde el inicio
+  ['nebula','gd','void','lava'],    // cap 1
+  ['gd','lava','void','nebula'],    // cap 2
+  ['void','lava','gd','nebula'],    // cap 3
+  ['lava','gd','nebula','void'],    // cap 4+
 ];
 const BOSS_SCENE = { regular:'lava', rescue:'void' };
 
@@ -2045,8 +2045,8 @@ function loop(now) {
     popups    = popups.filter(t => t.life > 0);
     checkCollisions();
 
-    // wave-complete for play mode
-    if (gState === 'play' && !transitioning && enemies.length === 0 && waveT > 1) {
+    // wave-complete for play mode (skip if waiting for boss wormhole)
+    if (gState === 'play' && !transitioning && enemies.length === 0 && waveT > 1 && !wormhole) {
       advanceLevel();
     }
   }
