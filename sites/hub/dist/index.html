@@ -1,5 +1,9 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Brincoovg</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Juegos web gratuitos. Sin descargas, sin registros. Juego nuevo cada semana.">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -338,7 +342,28 @@ a.card:hover {
 }
 .soc:hover { color: var(--fg); border-color: rgba(255,255,255,.22) }
 .soc svg { width: 16px; height: 16px }
+
+/* ---- contact ---- */
+.contact { background: var(--bg-1) }
+.contact-inner {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; gap: 2rem; padding-block: 5rem
+}
+.contact-title { font-family: var(--fd); font-size: clamp(2rem,5vw,3.2rem); letter-spacing: .06em }
+.contact-lead { color: var(--fg-2); max-width: 38ch; line-height: 1.6 }
+.contact-links { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center }
+.contact-btn {
+  display: inline-flex; align-items: center; gap: .55rem;
+  padding: .75rem 1.5rem; border-radius: 8px;
+  font-family: var(--fb); font-size: .9rem; font-weight: 600;
+  text-decoration: none; transition: opacity .2s
+}
+.contact-btn:hover { opacity: .85 }
+.contact-btn-email { background: var(--bg-2); color: var(--fg); border: 1px solid var(--border) }
+.contact-btn-wa { background: #25d366; color: #000 }
 </style>
+</head>
+<body>
 
 <!-- ============================================================
      SVG ICON DEFINITIONS (hidden, referenced via <use>)
@@ -393,6 +418,7 @@ a.card:hover {
     </a>
     <ul class="nav-links">
       <li><a href="#juegos">Juegos</a></li>
+      <li><a href="#contacto">Contacto</a></li>
     </ul>
   </div>
 </nav>
@@ -547,6 +573,31 @@ Requisitos para activar:
 </section>
 =================================================================
 -->
+
+<!-- ============================================================ CONTACT -->
+<section class="contact w" id="contacto">
+  <div class="c contact-inner">
+    <p class="eyebrow">¿Hablamos?</p>
+    <h2 class="contact-title">CONTACTO</h2>
+    <p class="contact-lead">Sugerencias, colaboraciones o simplemente saludar. Estamos aquí.</p>
+    <div class="contact-links">
+      <a class="contact-btn contact-btn-email" href="mailto:vg@brincoo.tech">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="4" width="20" height="16" rx="2"/>
+          <path d="M2 7l10 7 10-7"/>
+        </svg>
+        vg@brincoo.tech
+      </a>
+      <a class="contact-btn contact-btn-wa" href="https://wa.me/525534065410" target="_blank" rel="noopener">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+          <path d="M12 0C5.373 0 0 5.373 0 12c0 2.117.554 4.103 1.523 5.824L.057 23.215a.75.75 0 0 0 .928.928l5.391-1.466A11.942 11.942 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.89 0-3.663-.493-5.197-1.358l-.372-.214-3.853 1.048 1.048-3.853-.214-.372A9.944 9.944 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+        </svg>
+        WhatsApp
+      </a>
+    </div>
+  </div>
+</section>
 
 <!-- ============================================================ FOOTER -->
 <footer class="footer w">
@@ -888,3 +939,5 @@ Requisitos para activar:
 
 })();
 </script>
+</body>
+</html>
