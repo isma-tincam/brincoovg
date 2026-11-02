@@ -1,8 +1,4 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Espiral Nova</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -36,6 +32,15 @@ html, body { height: 100%; overflow: hidden; background: #040812; padding: 0 !im
   overflow: hidden; position: relative;
 }
 #ao-adbox ins { width: 100%; }
+#ao-adbox { position: relative; }
+#ao-ad-placeholder {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(160,80,255,0.35); font-size: 13px; letter-spacing: .22em;
+  pointer-events: none;
+}
+/* se oculta si AdSense inyecta un iframe real */
+#ao-adbox ins[data-ad-status="filled"] ~ #ao-ad-placeholder { display: none; }
 #ao-bar { width: 100%; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
 #ao-prog { height: 100%; width: 0%; background: linear-gradient(90deg,#7c3aed,#00eeff); }
 #ao-btn {
@@ -69,6 +74,7 @@ html, body { height: 100%; overflow: hidden; background: #040812; padding: 0 !im
            data-ad-slot="XXXXXXXXXX"
            data-ad-format="auto"
            data-full-width-responsive="true"></ins>
+      <div id="ao-ad-placeholder">ANUNCIO DE PRUEBA</div>
     </div>
 
     <div id="ao-bar"><div id="ao-prog"></div></div>
