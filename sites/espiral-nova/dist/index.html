@@ -316,7 +316,8 @@ let level = 0, score = 0, lives = 3, combo = 0, waveT = 0;
 let transitioning = false;
 let screenFlash = 0;
 let powItems = [], bombs = 1, lastComboMilestone = 0;
-let wormhole = null;       // { x, y, t, pulse }
+let wormhole = null;       // gusano normal: opcional, { x, y, t, pulse }
+let bossWormhole = null;   // gusano jefe: obligatorio, { x, y, t, pulse, bossLvl }
 let warpState = null;      // { t, phase:'enter'|'transit', fromX, fromY, toX, toY }
 let warpDistort = 0;       // 0..1 intensity of full-screen warp visual
 let wormholeCD = 0;        // cooldown before next wormhole spawns
@@ -950,8 +951,8 @@ function startLevel(lvl) {
     const stIdx = Math.min(Math.floor((lvl-6)/12), STORIES.length-1);
     showDialog((STORIES[Math.max(0,stIdx)] || STORIES[0]).pre, () => {});
   } else if (wt === 'boss') {
-    gState = 'play';
-    spawnBossWormhole(lvl);
+    gState = 'boss_wait';
+    bossWormhole = { x: W / 2, y: H * 0.40, t: 0, pulse: 0, bossLvl: lvl };
     showDialog([{ who:'CONTROL', txt:'Firma enorme detectada. ¡Entra al gusano rojo!' }], () => {});
   } else {
     gState = 'play';
@@ -971,10 +972,7 @@ function spawnWormhole() {
   wormhole = { x: rand(safeL, safeR), y: rand(safeTop, safeBot), t: 0, pulse: 0 };
   wormholeCD = 0;
 }
-function spawnBossWormhole(lvl) {
-  wormhole = { x: W / 2, y: H * 0.42, t: 0, pulse: 0, isBoss: true, bossLvl: lvl };
-  wormholeCD = 0;
-}
+
 
 function leastPopulatedArea() {
   const counts = new Array(9).fill(0);
@@ -991,6 +989,7 @@ function leastPopulatedArea() {
 }
 
 function updateWormhole(dt) {
+  // ── gusano normal: warp animation ──────────────────────────
   if (warpState) {
     warpState.t += dt;
     if (warpState.phase === 'enter') {
@@ -999,7 +998,6 @@ function updateWormhole(dt) {
         warpState.phase = 'transit'; warpState.t = 0;
         player.x = warpState.toX; player.y = warpState.toY;
         player.inv = Math.max(player.inv, 0.8);
-        // burst at exit point
         for (let i = 0; i < 3; i++) {
           const lm = 0.2 + i * 0.14;
           particles.push({ x: warpState.toX, y: warpState.toY, type:'ring', color: CL.vio,
@@ -1011,31 +1009,51 @@ function updateWormhole(dt) {
         bgScene = _pool[Math.floor(Math.random() * _pool.length)];
         screenFlash = bgScene !== 'space' ? 0.60 : 0.40;
         tone(bgScene !== 'space' ? 220 : 180, 0.55, 'sine', 0.12, bgScene !== 'space' ? 340 : 280);
-        // nuevo gusano aparece después de 5s de cooldown
         wormholeCD = 5.0;
       }
     } else if (warpState.phase === 'transit') {
       warpDistort = Math.max(0, 1 - warpState.t / 0.42);
       if (warpState.t >= 0.42) { warpState = null; warpDistort = 0; }
     }
-    return;
   }
-  // cooldown countdown — spawn new wormhole when it hits 0
-  if (wormholeCD > 0 && !wormhole) {
-    wormholeCD = Math.max(0, wormholeCD - dt);
-    if (wormholeCD <= 0 && (gState === 'play')) spawnWormhole();
-    return;
+
+  // ── gusano normal: cooldown y colisión ─────────────────────
+  if (!warpState) {
+    if (wormholeCD > 0 && !wormhole) {
+      wormholeCD = Math.max(0, wormholeCD - dt);
+      if (wormholeCD <= 0 && gState === 'play') spawnWormhole();
+    }
+    if (wormhole && player && !player.dead) {
+      wormhole.t += dt;
+      wormhole.pulse = Math.sin(wormhole.t * 3.2) * 0.5 + 0.5;
+      const dist = Math.hypot(player.x - wormhole.x, player.y - wormhole.y);
+      if (dist < 28) {
+        const dest = leastPopulatedArea();
+        warpState = { t: 0, phase: 'enter', fromX: player.x, fromY: player.y, toX: dest.x, toY: dest.y };
+        wormholesUsed++;
+        wormhole = null;
+        tone(60, 0.6, 'sawtooth', 0.14, -50);
+        for (let i = 0; i < 4; i++) {
+          const lm = 0.15 + i * 0.1;
+          particles.push({ x: player.x, y: player.y, type:'ring', color: CL.vio,
+                           vx:0, vy:0, life:lm, lifeMax:lm, maxR: 20 + i*28 });
+        }
+      } else if (dist < 90) {
+        const a = Math.atan2(wormhole.y - player.y, wormhole.x - player.x);
+        player.x += Math.cos(a) * (90 - dist) / 90 * 38 * dt;
+        player.y += Math.sin(a) * (90 - dist) / 90 * 38 * dt;
+      }
+    }
   }
-  if (!wormhole || !player || player.dead) return;
-  wormhole.t += dt;
-  wormhole.pulse = Math.sin(wormhole.t * 3.2) * 0.5 + 0.5;
-  // attract player if very close
-  const dist = Math.hypot(player.x - wormhole.x, player.y - wormhole.y);
-  if (dist < 28) {
-    if (wormhole.isBoss) {
-      // gusano jefe: entrada directa, activa escenario y pelea
-      const lvl = wormhole.bossLvl;
-      wormhole = null;
+
+  // ── gusano jefe: solo colisión, sin warp ───────────────────
+  if (bossWormhole && player && !player.dead) {
+    bossWormhole.t += dt;
+    bossWormhole.pulse = Math.sin(bossWormhole.t * 2.8) * 0.5 + 0.5;
+    const dist = Math.hypot(player.x - bossWormhole.x, player.y - bossWormhole.y);
+    if (dist < 36) {
+      const lvl = bossWormhole.bossLvl;
+      bossWormhole = null;
       bgScene = BOSS_SCENE.regular;
       screenFlash = 0.90;
       tone(55, 0.85, 'sawtooth', 0.18, -45);
@@ -1045,96 +1063,97 @@ function updateWormhole(dt) {
                          vx:0, vy:0, life:lm, lifeMax:lm, maxR: 28 + i*38 });
       }
       gState = 'boss'; boss = mkBoss('regular', lvl); switchMusic(true);
-      showDialog([{ who:'CONTROL', txt:'Firma enorme detectada. Prepárate para algo grande.' }], () => {});
-      return;
+      showDialog([{ who:'CONTROL', txt:'Prepárate para algo grande.' }], () => {});
+    } else if (dist < 120) {
+      const a = Math.atan2(bossWormhole.y - player.y, bossWormhole.x - player.x);
+      player.x += Math.cos(a) * (120 - dist) / 120 * 28 * dt;
+      player.y += Math.sin(a) * (120 - dist) / 120 * 28 * dt;
     }
-    // gusano normal: teletransporte + cambio de escenario
-    const dest = leastPopulatedArea();
-    warpState = { t: 0, phase: 'enter', fromX: player.x, fromY: player.y, toX: dest.x, toY: dest.y };
-    wormholesUsed++;
-    wormhole = null;
-    tone(60, 0.6, 'sawtooth', 0.14, -50);
-    for (let i = 0; i < 4; i++) {
-      const lm = 0.15 + i * 0.1;
-      particles.push({ x: player.x, y: player.y, type:'ring', color: CL.vio,
-                       vx:0, vy:0, life:lm, lifeMax:lm, maxR: 20 + i*28 });
-    }
-  } else if (dist < 90) {
-    // soft gravitational pull
-    const a = Math.atan2(wormhole.y - player.y, wormhole.x - player.x);
-    const pull = (90 - dist) / 90 * 38;
-    player.x += Math.cos(a) * pull * dt;
-    player.y += Math.sin(a) * pull * dt;
   }
 }
 
 function drawWormhole() {
-  if (!wormhole) return;
-  const { x, y, t, pulse } = wormhole;
-  const isBoss = !!wormhole.isBoss;
-  ctx.save();
-  ctx.translate(x, y);
-  if (isBoss) ctx.scale(1.45, 1.45);
-
-  // accretion disk (Interstellar-style - tilted ellipse)
-  const diskRot = t * (isBoss ? 1.3 : 0.8);
-  ctx.save(); ctx.rotate(diskRot);
-  for (let ring = 0; ring < 3; ring++) {
-    const rScale = 1 - ring * 0.08;
-    ctx.save(); ctx.scale(1, 0.22 + ring * 0.05);
-    const alpha = [0.7, 0.45, 0.22][ring];
-    const diskGrad = ctx.createRadialGradient(0,0, 22, 0,0, 56 - ring*6);
-    const col = isBoss
-      ? (ring === 0 ? CL.red : ring === 1 ? CL.amber : '#881100')
-      : (ring === 0 ? CL.amber : ring === 1 ? CL.gold : CL.vio);
-    diskGrad.addColorStop(0, col + '00');
-    diskGrad.addColorStop(0.35, col + 'ff');
-    diskGrad.addColorStop(0.7, col + 'aa');
-    diskGrad.addColorStop(1, col + '00');
-    ctx.globalAlpha = alpha;
-    ctx.shadowBlur = 18; ctx.shadowColor = col;
-    ctx.fillStyle = diskGrad;
-    ctx.beginPath(); ctx.arc(0, 0, 56 - ring*6, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
-  }
-  ctx.restore();
-
-  // black hole center
-  const bhGrad = ctx.createRadialGradient(0,0,0,0,0,24);
-  bhGrad.addColorStop(0, '#000000');
-  bhGrad.addColorStop(0.8, '#000010');
-  bhGrad.addColorStop(1, '#00003010');
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = bhGrad;
-  ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI*2); ctx.fill();
-
-  // gravitational lensing ring
-  ctx.save(); ctx.rotate(-t * 1.4);
-  ctx.strokeStyle = isBoss ? CL.red : CL.vio; ctx.lineWidth = isBoss ? 2.2 : 1.5;
-  ctx.shadowBlur = 12; ctx.shadowColor = isBoss ? CL.red : CL.vio;
-  ctx.globalAlpha = 0.5 + 0.3 * pulse;
-  ctx.setLineDash([6, 10]); ctx.beginPath(); ctx.arc(0, 0, 30 + pulse * 5, 0, Math.PI*2); ctx.stroke();
-  ctx.setLineDash([]); ctx.restore();
-
-  // outer spiral arms
-  ctx.save(); ctx.rotate(t * (isBoss ? 0.9 : 0.55));
-  ctx.globalAlpha = 0.35 + 0.2 * pulse;
-  ctx.strokeStyle = isBoss ? CL.amber : CL.cyan; ctx.lineWidth = 1.2;
-  ctx.shadowBlur = 8; ctx.shadowColor = isBoss ? CL.amber : CL.cyan;
-  for (let arm = 0; arm < 2; arm++) {
-    ctx.save(); ctx.rotate(arm * Math.PI);
-    ctx.beginPath();
-    for (let i = 0; i < 60; i++) {
-      const r = 28 + i * 0.7, a = i * 0.22;
-      i === 0 ? ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r) : ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+  // dibuja gusano normal (opcional, cian/violeta)
+  if (wormhole) {
+    const { x, y, t, pulse } = wormhole;
+    ctx.save(); ctx.translate(x, y);
+    ctx.save(); ctx.rotate(t * 0.8);
+    for (let ring = 0; ring < 3; ring++) {
+      ctx.save(); ctx.scale(1, 0.22 + ring * 0.05);
+      const alpha = [0.7, 0.45, 0.22][ring];
+      const diskGrad = ctx.createRadialGradient(0,0, 22, 0,0, 56 - ring*6);
+      const col = ring === 0 ? CL.amber : ring === 1 ? CL.gold : CL.vio;
+      diskGrad.addColorStop(0, col + '00'); diskGrad.addColorStop(0.35, col + 'ff');
+      diskGrad.addColorStop(0.7, col + 'aa'); diskGrad.addColorStop(1, col + '00');
+      ctx.globalAlpha = alpha; ctx.shadowBlur = 18; ctx.shadowColor = col;
+      ctx.fillStyle = diskGrad; ctx.beginPath(); ctx.arc(0, 0, 56 - ring*6, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
     }
-    ctx.stroke(); ctx.restore();
+    ctx.restore();
+    const bhGrad = ctx.createRadialGradient(0,0,0,0,0,24);
+    bhGrad.addColorStop(0, '#000000'); bhGrad.addColorStop(1, '#00003010');
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.fillStyle = bhGrad;
+    ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI*2); ctx.fill();
+    ctx.save(); ctx.rotate(-t * 1.4);
+    ctx.strokeStyle = CL.vio; ctx.lineWidth = 1.5; ctx.shadowBlur = 12; ctx.shadowColor = CL.vio;
+    ctx.globalAlpha = 0.5 + 0.3 * pulse; ctx.setLineDash([6, 10]);
+    ctx.beginPath(); ctx.arc(0, 0, 30 + pulse * 5, 0, Math.PI*2); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
+    ctx.save(); ctx.rotate(t * 0.55); ctx.globalAlpha = 0.35 + 0.2 * pulse;
+    ctx.strokeStyle = CL.cyan; ctx.lineWidth = 1.2; ctx.shadowBlur = 8; ctx.shadowColor = CL.cyan;
+    for (let arm = 0; arm < 2; arm++) {
+      ctx.save(); ctx.rotate(arm * Math.PI); ctx.beginPath();
+      for (let i = 0; i < 60; i++) {
+        const r = 28 + i * 0.7, a = i * 0.22;
+        i === 0 ? ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r) : ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+      }
+      ctx.stroke(); ctx.restore();
+    }
+    ctx.restore(); ctx.restore();
   }
-  ctx.restore();
 
-  // ── anillos planetarios (solo jefe) ──────────────────────────
-  if (isBoss) {
+  // dibuja gusano jefe (obligatorio, rojo con anillos planetarios)
+  if (bossWormhole) {
+    const { x, y, t, pulse } = bossWormhole;
+    ctx.save(); ctx.translate(x, y); ctx.scale(1.45, 1.45);
+    // disco de acreción rojo
+    ctx.save(); ctx.rotate(t * 1.3);
+    for (let ring = 0; ring < 3; ring++) {
+      ctx.save(); ctx.scale(1, 0.22 + ring * 0.05);
+      const alpha = [0.7, 0.45, 0.22][ring];
+      const col = ring === 0 ? CL.red : ring === 1 ? CL.amber : '#881100';
+      const diskGrad = ctx.createRadialGradient(0,0, 22, 0,0, 56 - ring*6);
+      diskGrad.addColorStop(0, col + '00'); diskGrad.addColorStop(0.35, col + 'ff');
+      diskGrad.addColorStop(0.7, col + 'aa'); diskGrad.addColorStop(1, col + '00');
+      ctx.globalAlpha = alpha; ctx.shadowBlur = 18; ctx.shadowColor = col;
+      ctx.fillStyle = diskGrad; ctx.beginPath(); ctx.arc(0, 0, 56 - ring*6, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+    // centro negro
+    const bhGrad = ctx.createRadialGradient(0,0,0,0,0,26);
+    bhGrad.addColorStop(0, '#000000'); bhGrad.addColorStop(1, '#11000010');
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.fillStyle = bhGrad;
+    ctx.beginPath(); ctx.arc(0, 0, 26, 0, Math.PI*2); ctx.fill();
+    // anillo de lente
+    ctx.save(); ctx.rotate(-t * 1.4);
+    ctx.strokeStyle = CL.red; ctx.lineWidth = 2.2; ctx.shadowBlur = 14; ctx.shadowColor = CL.red;
+    ctx.globalAlpha = 0.5 + 0.3 * pulse; ctx.setLineDash([6, 10]);
+    ctx.beginPath(); ctx.arc(0, 0, 32 + pulse * 6, 0, Math.PI*2); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
+    // brazos espiral ámbar
+    ctx.save(); ctx.rotate(t * 0.9); ctx.globalAlpha = 0.35 + 0.2 * pulse;
+    ctx.strokeStyle = CL.amber; ctx.lineWidth = 1.2; ctx.shadowBlur = 8; ctx.shadowColor = CL.amber;
+    for (let arm = 0; arm < 2; arm++) {
+      ctx.save(); ctx.rotate(arm * Math.PI); ctx.beginPath();
+      for (let i = 0; i < 60; i++) {
+        const r = 30 + i * 0.7, a = i * 0.22;
+        i === 0 ? ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r) : ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+      }
+      ctx.stroke(); ctx.restore();
+    }
+    ctx.restore();
+    // anillos planetarios tipo Saturno
     const rings = [
       { rx: 68, ry: 12, tilt: 0.55, speed: 0.28, col: CL.red,   alpha: 0.72, lw: 3.0 },
       { rx: 84, ry:  9, tilt:-0.40, speed:-0.20, col: CL.amber,  alpha: 0.55, lw: 2.0 },
@@ -1142,37 +1161,31 @@ function drawWormhole() {
       { rx: 96, ry:  7, tilt:-0.80, speed:-0.14, col:'#ffaa00',  alpha: 0.30, lw: 1.2 },
     ];
     for (const rg of rings) {
-      ctx.save();
-      ctx.rotate(rg.tilt + t * rg.speed);
-      // back half (behind black hole) — drawn first, clipped lower opacity
-      ctx.globalAlpha = rg.alpha * 0.35;
+      ctx.save(); ctx.rotate(rg.tilt + t * rg.speed);
       ctx.strokeStyle = rg.col; ctx.lineWidth = rg.lw;
       ctx.shadowBlur = 14; ctx.shadowColor = rg.col;
+      // mitad trasera (más opaca)
+      ctx.globalAlpha = rg.alpha * 0.35;
       ctx.beginPath(); ctx.ellipse(0, 0, rg.rx, rg.ry, 0, Math.PI, Math.PI*2); ctx.stroke();
-      // front half (in front of black hole)
+      // mitad delantera (brillante)
       ctx.globalAlpha = rg.alpha;
       ctx.beginPath(); ctx.ellipse(0, 0, rg.rx, rg.ry, 0, 0, Math.PI); ctx.stroke();
-      // bright edge dots on the ring
-      ctx.globalAlpha = rg.alpha * 0.85;
-      ctx.fillStyle = rg.col;
+      // puntos en el anillo
+      ctx.globalAlpha = rg.alpha * 0.85; ctx.fillStyle = rg.col;
       for (let d = 0; d < 6; d++) {
         const ang = (d / 6) * Math.PI * 2 + t * rg.speed * 2.2;
-        const dx = Math.cos(ang) * rg.rx, dy = Math.sin(ang) * rg.ry * 0.9;
-        ctx.beginPath(); ctx.arc(dx, dy, 1.6, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(Math.cos(ang)*rg.rx, Math.sin(ang)*rg.ry*0.9, 1.6, 0, Math.PI*2); ctx.fill();
       }
       ctx.restore();
     }
-    // warning label pulsante
-    ctx.globalAlpha = 0.65 + 0.35 * pulse;
-    ctx.fillStyle = CL.red;
-    ctx.font = 'bold 9px monospace';
-    ctx.textAlign = 'center';
+    // etiqueta ⚠ JEFE
+    ctx.globalAlpha = 0.65 + 0.35 * pulse; ctx.fillStyle = CL.red;
+    ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
     ctx.shadowBlur = 10; ctx.shadowColor = CL.red;
-    ctx.fillText('⚠ JEFE', 0, 110 / 1.45);
+    ctx.fillText('⚠ JEFE', 0, 76);
     ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    ctx.restore();
   }
-
-  ctx.restore();
 }
 
 function drawWarpOverlay() {
@@ -1944,7 +1957,7 @@ function initGame() {
   if (player) { player.pow = null; player.powLvl = 0; }
   bullets = []; eBullets = []; enemies = []; particles = []; popups = [];
   boss = null; escort = null; dialog = null; transitioning = false;
-  wormhole = null; warpState = null; warpDistort = 0; wormholeCD = 0; bgScene = 'space';
+  wormhole = null; bossWormhole = null; warpState = null; warpDistort = 0; wormholeCD = 0; bgScene = 'space';
   player = mkPlayer(); startMusic(false); advanceLevel();
 }
 
@@ -1969,8 +1982,8 @@ function loop(now) {
     popups    = popups.filter(t => t.life > 0);
     checkCollisions();
 
-    // wave-complete — normal: advance even if wormhole visible (optional); boss: wait for wormhole entry
-    if (gState === 'play' && !transitioning && enemies.length === 0 && waveT > 1 && !wormhole?.isBoss) {
+    // gusano normal es opcional — avanza cuando no hay enemigos (boss_wait no entra aquí)
+    if (gState === 'play' && !transitioning && enemies.length === 0 && waveT > 1) {
       advanceLevel();
     }
   }
