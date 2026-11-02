@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Espiral Nova Beta</title>
+<title>Espiral Nova</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Space+Mono:wght@400;700&display=swap">
@@ -118,6 +118,99 @@ const SFX = {
   playerHit: () => tone(90,   0.30, 'sawtooth',  0.14, -50),
   bossHit:   () => tone(220,  0.07, 'square',    0.12, -40),
 };
+
+// ── music ────────────────────────────────────────────────────
+let mGain = null, mPlaying = false, mTimer = null;
+let mNextBar = 0, mBarIdx = 0, mBossMode = false;
+
+const M_NORMAL = { bpm: 138, vol: 0.28,
+  chords: [[110,130.8,164.8],[87.3,110,130.8],[130.8,164.8,196],[98,123.5,146.8]] };
+const M_BOSS   = { bpm: 162, vol: 0.34,
+  chords: [[220,261.6,329.6],[196,220,261.6],[174.6,220,261.6],[196,246.9,293.7]] };
+
+function mNote(freq, t, dur, type, vol) {
+  if (!AC || !mGain) return;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur - 0.01);
+  o.connect(g); g.connect(mGain); o.start(t); o.stop(t + dur);
+}
+function mNoise(t, dur, vol, hpFreq) {
+  if (!AC || !mGain) return;
+  const buf = AC.createBuffer(1, Math.ceil(AC.sampleRate * dur), AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = AC.createBufferSource(), filt = AC.createBiquadFilter(), g = AC.createGain();
+  src.buffer = buf; filt.type = 'highpass'; filt.frequency.value = hpFreq;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(filt); filt.connect(g); g.connect(mGain); src.start(t);
+}
+function mScheduleBar(t, cfg, barIdx) {
+  const beat = 60 / cfg.bpm;
+  const chord = cfg.chords[barIdx % cfg.chords.length];
+  // bass: root on 1 & 3, fifth on 2 & 4
+  mNote(chord[0] / 2, t,             beat * 0.85, 'square',   0.18);
+  mNote(chord[2] / 2, t + beat,      beat * 0.85, 'square',   0.12);
+  mNote(chord[0] / 2, t + beat * 2,  beat * 0.85, 'square',   0.18);
+  mNote(chord[2] / 2, t + beat * 3,  beat * 0.85, 'square',   0.12);
+  // arpeggio: 8th notes cycling chord tones (2 octaves up)
+  for (let i = 0; i < 8; i++) {
+    const f = chord[i % chord.length] * 2;
+    mNote(f, t + i * beat * 0.5, beat * 0.38, 'triangle', mBossMode ? 0.09 : 0.07);
+  }
+  // lead (boss only): alternating 5th and octave stabs
+  if (mBossMode) {
+    mNote(chord[1] * 4, t,            beat * 0.18, 'sawtooth', 0.06);
+    mNote(chord[0] * 4, t + beat * 2, beat * 0.18, 'sawtooth', 0.06);
+  }
+  // kick: beats 1 & 3
+  mNote(75, t,            0.14, 'sine', 0.35);
+  mNote(60, t + beat * 2, 0.14, 'sine', 0.30);
+  // snare: beats 2 & 4
+  mNoise(t + beat,      0.10, 0.20, 2000);
+  mNoise(t + beat * 3,  0.10, 0.18, 2000);
+  // hi-hat: every 8th note
+  for (let i = 0; i < 8; i++)
+    mNoise(t + i * beat * 0.5, 0.04, i % 2 === 0 ? 0.07 : 0.04, 9000);
+}
+function mTick() {
+  if (!mPlaying || !AC) return;
+  const cfg = mBossMode ? M_BOSS : M_NORMAL;
+  const bar = 60 / cfg.bpm * 4;
+  const now = AC.currentTime;
+  while (mNextBar < now + 0.15) {
+    mScheduleBar(mNextBar, cfg, mBarIdx++);
+    mNextBar += bar;
+  }
+  mTimer = setTimeout(mTick, 60);
+}
+function startMusic(bossMode = false) {
+  unlockAudio();
+  if (!AC) return;
+  mBossMode = bossMode;
+  if (!mGain) { mGain = AC.createGain(); mGain.connect(AC.destination); }
+  const cfg = bossMode ? M_BOSS : M_NORMAL;
+  mGain.gain.setTargetAtTime(cfg.vol, AC.currentTime, 0.3);
+  if (!mPlaying) {
+    mPlaying = true; mNextBar = AC.currentTime + 0.05; mBarIdx = 0;
+  }
+  mTick();
+}
+function stopMusic() {
+  mPlaying = false;
+  if (mTimer) clearTimeout(mTimer); mTimer = null;
+  if (mGain && AC) mGain.gain.setTargetAtTime(0, AC.currentTime, 0.5);
+}
+function switchMusic(bossMode) {
+  if (mBossMode === bossMode) return;
+  mBossMode = bossMode;
+  if (mPlaying && mGain && AC) {
+    const cfg = bossMode ? M_BOSS : M_NORMAL;
+    mGain.gain.setTargetAtTime(cfg.vol, AC.currentTime, 0.3);
+  }
+}
 
 // ── utils ────────────────────────────────────────────────────
 const rand  = (a, b) => a + Math.random() * (b - a);
@@ -837,7 +930,7 @@ function checkCollisions() {
           escort.dead = true; burst(escort.x, escort.y, CL.gold, 20); SFX.boom();
           const st = STORIES[Math.min(Math.floor((level-6)/12), STORIES.length-1)] || STORIES[0];
           showDialog(st.fail, () => {
-            gState = 'rescue'; boss = mkBoss('rescue', level);
+            gState = 'rescue'; boss = mkBoss('rescue', level); switchMusic(true);
             enemies = []; eBullets = [];
           });
         }
@@ -855,7 +948,7 @@ function hitPlayer() {
   lives--; combo = 0; SFX.playerHit();
   if (lives <= 0) {
     explodePlayer(player.x, player.y);
-    player.dead = true; setTimeout(() => { gState = 'over'; }, 2800);
+    player.dead = true; stopMusic(); setTimeout(() => { gState = 'over'; }, 2800);
   } else {
     burst(player.x, player.y, CL.cyan, 14);
     player.inv = 2.5;
@@ -899,7 +992,7 @@ function startLevel(lvl) {
     const stIdx = Math.min(Math.floor((lvl-6)/12), STORIES.length-1);
     showDialog((STORIES[Math.max(0,stIdx)] || STORIES[0]).pre, () => {});
   } else if (wt === 'boss') {
-    gState = 'boss'; boss = mkBoss('regular', lvl);
+    gState = 'boss'; boss = mkBoss('regular', lvl); switchMusic(true);
     showDialog([{ who:'CONTROL', txt:'Firma enorme detectada. Prepárate para algo grande.' }], () => {});
   } else {
     gState = 'play';
@@ -1106,6 +1199,7 @@ function onBossDefeated() {
     : { who:'NOVA-1', txt:'Despejado. Continuamos.' };
   const bossType = boss ? boss.type : 'regular';
   boss = null;
+  switchMusic(false);
   showDialog([line], () => {
     const precision = shotsFired > 0 ? shotsHit / shotsFired : 0;
     const precPct   = Math.round(precision * 100);
@@ -1755,7 +1849,7 @@ function initGame() {
   bullets = []; eBullets = []; enemies = []; particles = []; popups = [];
   boss = null; escort = null; dialog = null; transitioning = false;
   wormhole = null; warpState = null; warpDistort = 0; wormholeCD = 0;
-  player = mkPlayer(); advanceLevel();
+  player = mkPlayer(); startMusic(false); advanceLevel();
 }
 
 // ── main loop ────────────────────────────────────────────────
