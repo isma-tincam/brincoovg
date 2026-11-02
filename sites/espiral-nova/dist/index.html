@@ -12,8 +12,7 @@
 html, body { height: 100%; overflow: hidden; background: #040812; padding: 0 !important; }
 #c { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 </style>
-</head>
-<body>
+</head><body>
 <canvas id="c"></canvas>
 <script>
 // ════════════════════════════════════════════════════════════
@@ -1134,6 +1133,45 @@ function drawWormhole() {
   }
   ctx.restore();
 
+  // ── anillos planetarios (solo jefe) ──────────────────────────
+  if (isBoss) {
+    const rings = [
+      { rx: 68, ry: 12, tilt: 0.55, speed: 0.28, col: CL.red,   alpha: 0.72, lw: 3.0 },
+      { rx: 84, ry:  9, tilt:-0.40, speed:-0.20, col: CL.amber,  alpha: 0.55, lw: 2.0 },
+      { rx: 52, ry: 16, tilt: 1.10, speed: 0.42, col:'#ff2200',  alpha: 0.40, lw: 1.5 },
+      { rx: 96, ry:  7, tilt:-0.80, speed:-0.14, col:'#ffaa00',  alpha: 0.30, lw: 1.2 },
+    ];
+    for (const rg of rings) {
+      ctx.save();
+      ctx.rotate(rg.tilt + t * rg.speed);
+      // back half (behind black hole) — drawn first, clipped lower opacity
+      ctx.globalAlpha = rg.alpha * 0.35;
+      ctx.strokeStyle = rg.col; ctx.lineWidth = rg.lw;
+      ctx.shadowBlur = 14; ctx.shadowColor = rg.col;
+      ctx.beginPath(); ctx.ellipse(0, 0, rg.rx, rg.ry, 0, Math.PI, Math.PI*2); ctx.stroke();
+      // front half (in front of black hole)
+      ctx.globalAlpha = rg.alpha;
+      ctx.beginPath(); ctx.ellipse(0, 0, rg.rx, rg.ry, 0, 0, Math.PI); ctx.stroke();
+      // bright edge dots on the ring
+      ctx.globalAlpha = rg.alpha * 0.85;
+      ctx.fillStyle = rg.col;
+      for (let d = 0; d < 6; d++) {
+        const ang = (d / 6) * Math.PI * 2 + t * rg.speed * 2.2;
+        const dx = Math.cos(ang) * rg.rx, dy = Math.sin(ang) * rg.ry * 0.9;
+        ctx.beginPath(); ctx.arc(dx, dy, 1.6, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
+    // warning label pulsante
+    ctx.globalAlpha = 0.65 + 0.35 * pulse;
+    ctx.fillStyle = CL.red;
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowBlur = 10; ctx.shadowColor = CL.red;
+    ctx.fillText('⚠ JEFE', 0, 110 / 1.45);
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  }
+
   ctx.restore();
 }
 
@@ -1931,8 +1969,8 @@ function loop(now) {
     popups    = popups.filter(t => t.life > 0);
     checkCollisions();
 
-    // wave-complete for play mode (skip if waiting for boss wormhole)
-    if (gState === 'play' && !transitioning && enemies.length === 0 && waveT > 1 && !wormhole) {
+    // wave-complete — normal: advance even if wormhole visible (optional); boss: wait for wormhole entry
+    if (gState === 'play' && !transitioning && enemies.length === 0 && waveT > 1 && !wormhole?.isBoss) {
       advanceLevel();
     }
   }
@@ -1946,5 +1984,4 @@ player = mkPlayer();
 bullets = []; eBullets = []; enemies = []; particles = []; popups = [];
 requestAnimationFrame(loop);
 </script>
-</body>
-</html>
+</body></html>
