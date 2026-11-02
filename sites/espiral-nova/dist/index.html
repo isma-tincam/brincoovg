@@ -11,9 +11,74 @@
 :root { color-scheme: dark; }
 html, body { height: 100%; overflow: hidden; background: #040812; padding: 0 !important; }
 #c { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+/* ── overlay de anuncio ───────────────────────────────── */
+#adoverlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(4,8,18,0.97);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Orbitron', monospace;
+}
+#adoverlay-inner {
+  max-width: 520px; width: 90%;
+  display: flex; flex-direction: column; align-items: center; gap: 20px;
+  padding: 28px 20px;
+}
+#ao-title {
+  color: #a855f7; font-size: clamp(20px,5vw,36px); font-weight: 900;
+  text-shadow: 0 0 24px #a855f7; letter-spacing: .12em; text-align: center;
+}
+#ao-title span { color: #00eeff; }
+#ao-adbox {
+  width: 100%; min-height: 130px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(160,80,255,0.25); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; position: relative;
+}
+#ao-adbox ins { width: 100%; }
+#ao-bar { width: 100%; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+#ao-prog { height: 100%; width: 0%; background: linear-gradient(90deg,#7c3aed,#00eeff); }
+#ao-btn {
+  background: none; border: 2px solid #5b21b6; color: #7c3aed;
+  font-family: 'Orbitron', monospace; font-size: 14px;
+  padding: 13px 40px; cursor: not-allowed; border-radius: 4px;
+  letter-spacing: .1em; transition: all .3s;
+}
+#ao-btn.ready {
+  border-color: #00eeff; color: #00eeff; cursor: pointer;
+  animation: aopulse 0.9s ease-in-out infinite alternate;
+}
+@keyframes aopulse {
+  from { box-shadow: 0 0 10px rgba(0,238,255,.25); }
+  to   { box-shadow: 0 0 28px rgba(0,238,255,.70); }
+}
 </style>
 </head><body>
 <canvas id="c"></canvas>
+
+<!-- ── overlay de anuncio (3 s antes de jugar) ───────────── -->
+<div id="adoverlay">
+  <div id="adoverlay-inner">
+    <div id="ao-title"><span>✦</span> ESPIRAL NOVA <span>✦</span></div>
+
+    <div id="ao-adbox">
+      <!-- REEMPLAZA data-ad-client y data-ad-slot con tus IDs de AdSense -->
+      <ins class="adsbygoogle"
+           style="display:block;width:100%;min-height:120px"
+           data-ad-client="ca-pub-XXXXXXXXXXXXXXXXX"
+           data-ad-slot="XXXXXXXXXX"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+    </div>
+
+    <div id="ao-bar"><div id="ao-prog"></div></div>
+    <button id="ao-btn" disabled>Jugando en <span id="ao-secs">3</span>s…</button>
+  </div>
+</div>
+
+<!-- Script de AdSense — reemplaza el publisher ID -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
+
 <script>
 // ════════════════════════════════════════════════════════════
 //  ESPIRAL NOVA  ·  formation wave shooter  v8
@@ -1996,5 +2061,37 @@ function loop(now) {
 player = mkPlayer();
 bullets = []; eBullets = []; enemies = []; particles = []; popups = [];
 requestAnimationFrame(loop);
+
+// ── overlay countdown ─────────────────────────────────────────
+(function() {
+  const overlay  = document.getElementById('adoverlay');
+  const btn      = document.getElementById('ao-btn');
+  const secsEl   = document.getElementById('ao-secs');
+  const prog     = document.getElementById('ao-prog');
+  if (!overlay) return;
+  // empuja el anuncio
+  try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch(e) {}
+  const DELAY = 3000, t0 = performance.now();
+  function tick(now) {
+    const elapsed = Math.min(now - t0, DELAY);
+    prog.style.width = (elapsed / DELAY * 100) + '%';
+    const secs = Math.ceil((DELAY - elapsed) / 1000);
+    if (elapsed < DELAY) {
+      secsEl.textContent = secs;
+      requestAnimationFrame(tick);
+    } else {
+      btn.innerHTML = '¡ JUGAR !';
+      btn.disabled  = false;
+      btn.classList.add('ready');
+    }
+  }
+  requestAnimationFrame(tick);
+  btn.addEventListener('click', () => {
+    if (btn.disabled) return;
+    overlay.style.transition = 'opacity 0.45s';
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.remove(), 460);
+  });
+})();
 </script>
 </body></html>
