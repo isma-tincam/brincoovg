@@ -7,82 +7,123 @@
 :root { color-scheme: dark; }
 html, body { height: 100%; overflow: hidden; background: #040812; padding: 0 !important; }
 #c { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
-/* ── overlay de anuncio ───────────────────────────────── */
-#adoverlay {
-  position: fixed; inset: 0; z-index: 9999;
-  background: rgba(4,8,18,0.97);
-  display: flex; align-items: center; justify-content: center;
+/* ── barra inferior de título ─────────────────────────── */
+#gamebar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(4,8,18,0.93);
+  border-top: 1px solid rgba(120,50,220,0.30);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: stretch; gap: 0;
+  transform: translateY(0); opacity: 1;
+  transition: transform .5s cubic-bezier(.4,0,.2,1), opacity .4s ease;
   font-family: 'Orbitron', monospace;
 }
-#adoverlay-inner {
-  max-width: 520px; width: 90%;
-  display: flex; flex-direction: column; align-items: center; gap: 20px;
-  padding: 28px 20px;
-}
-#ao-title {
-  color: #a855f7; font-size: clamp(20px,5vw,36px); font-weight: 900;
-  text-shadow: 0 0 24px #a855f7; letter-spacing: .12em; text-align: center;
-}
-#ao-title span { color: #00eeff; }
-#ao-adbox {
-  width: 100%; min-height: 130px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(160,80,255,0.25); border-radius: 8px;
+#gamebar.hidden { transform: translateY(110%); opacity: 0; pointer-events: none; }
+
+/* columna de anuncio */
+#gb-ad {
+  flex: 0 0 320px; min-height: 120px; max-width: 50%;
+  border-right: 1px solid rgba(120,50,220,0.20);
   display: flex; align-items: center; justify-content: center;
-  overflow: hidden; position: relative;
+  position: relative; overflow: hidden;
 }
-#ao-adbox ins { width: 100%; }
-#ao-adbox { position: relative; }
-#ao-ad-placeholder {
+#gb-ad ins { width: 100%; }
+#gb-ad-ph {
   position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  color: rgba(160,80,255,0.35); font-size: 13px; letter-spacing: .22em;
+  display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px;
+  color: rgba(140,80,255,0.30); font-size: 11px; letter-spacing: .22em;
   pointer-events: none;
 }
-/* se oculta si AdSense inyecta un iframe real */
-#ao-adbox ins[data-ad-status="filled"] ~ #ao-ad-placeholder { display: none; }
-#ao-bar { width: 100%; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
-#ao-prog { height: 100%; width: 0%; background: linear-gradient(90deg,#7c3aed,#00eeff); }
-#ao-btn {
-  background: none; border: 2px solid #5b21b6; color: #7c3aed;
-  font-family: 'Orbitron', monospace; font-size: 14px;
-  padding: 13px 40px; cursor: not-allowed; border-radius: 4px;
-  letter-spacing: .1em; transition: all .3s;
+#gb-ad-ph svg { opacity: .18; }
+#gb-ad ins[data-ad-status="filled"] ~ #gb-ad-ph { display: none; }
+
+/* columna de opciones */
+#gb-opts {
+  flex: 1; display: flex; align-items: stretch;
+  padding: 0 4px;
 }
-#ao-btn.ready {
-  border-color: #00eeff; color: #00eeff; cursor: pointer;
-  animation: aopulse 0.9s ease-in-out infinite alternate;
+.gb-card {
+  flex: 1; padding: 14px 16px;
+  border-right: 1px solid rgba(120,50,220,0.15);
+  display: flex; flex-direction: column; justify-content: center; gap: 5px;
 }
-@keyframes aopulse {
-  from { box-shadow: 0 0 10px rgba(0,238,255,.25); }
-  to   { box-shadow: 0 0 28px rgba(0,238,255,.70); }
+.gb-card:last-child { border-right: none; }
+.gb-card-title {
+  font-size: 9px; letter-spacing: .18em; color: #7c3aed;
+  text-transform: uppercase; font-weight: 700;
+}
+.gb-card-body {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(10px,1.2vw,12px); color: rgba(200,215,255,.70);
+  line-height: 1.5;
+}
+.gb-card-body .key {
+  display: inline-block; background: rgba(120,50,220,.22);
+  border: 1px solid rgba(120,50,220,.4); border-radius: 3px;
+  padding: 0 5px; font-size: 10px; color: #00eeff;
+  line-height: 1.6; margin: 0 1px;
+}
+@media (max-width: 600px) {
+  #gb-ad { display: none; }
+  .gb-card { padding: 10px 12px; }
 }
 </style>
 </head><body>
 <canvas id="c"></canvas>
 
-<!-- ── overlay de anuncio (3 s antes de jugar) ───────────── -->
-<div id="adoverlay">
-  <div id="adoverlay-inner">
-    <div id="ao-title"><span>✦</span> ESPIRAL NOVA <span>✦</span></div>
+<!-- ── barra inferior visible en pantalla de título ───────── -->
+<div id="gamebar">
 
-    <div id="ao-adbox">
-      <!-- REEMPLAZA data-ad-client y data-ad-slot con tus IDs de AdSense -->
-      <ins class="adsbygoogle"
-           style="display:block;width:100%;min-height:120px"
-           data-ad-client="ca-pub-XXXXXXXXXXXXXXXXX"
-           data-ad-slot="XXXXXXXXXX"
-           data-ad-format="auto"
-           data-full-width-responsive="true"></ins>
-      <div id="ao-ad-placeholder">ANUNCIO DE PRUEBA</div>
+  <!-- columna izquierda: espacio de anuncio -->
+  <div id="gb-ad">
+    <!-- REEMPLAZA ca-pub-XXX y data-ad-slot cuando tengas AdSense aprobado -->
+    <ins class="adsbygoogle"
+         style="display:block;width:320px;height:100px"
+         data-ad-client="ca-pub-XXXXXXXXXXXXXXXXX"
+         data-ad-slot="XXXXXXXXXX"
+         data-ad-format="fixed"></ins>
+    <div id="gb-ad-ph">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="1.5">
+        <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+      </svg>
+      ANUNCIO DE PRUEBA
+    </div>
+  </div>
+
+  <!-- columna derecha: opciones / info -->
+  <div id="gb-opts">
+
+    <div class="gb-card">
+      <div class="gb-card-title">✦ CONTROLES</div>
+      <div class="gb-card-body">
+        <span class="key">Mouse</span> mover &nbsp;·&nbsp;
+        <span class="key">Click</span> disparar<br>
+        <span class="key">Shift</span> bomba &nbsp;·&nbsp;
+        <span class="key">ESC</span> pausa
+      </div>
     </div>
 
-    <div id="ao-bar"><div id="ao-prog"></div></div>
-    <button id="ao-btn" disabled>Jugando en <span id="ao-secs">3</span>s…</button>
+    <div class="gb-card">
+      <div class="gb-card-title">⚡ OBJETIVO</div>
+      <div class="gb-card-body">
+        Destruye oleadas enemigas · Recoge potenciadores ·
+        Entra al gusano rojo para enfrentar al jefe de cada capítulo
+      </div>
+    </div>
+
+    <div class="gb-card">
+      <div class="gb-card-title">★ PUNTUACIÓN</div>
+      <div class="gb-card-body">
+        Mantén el combo para multiplicar puntos ·
+        Bombas y vidas extra cada 4 niveles ·
+        Usa el gusano azul para cambiar de escenario
+      </div>
+    </div>
+
   </div>
 </div>
 
-<!-- Script de AdSense — reemplaza el publisher ID -->
+<!-- Script de AdSense -->
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
 
 <script>
@@ -2030,6 +2071,8 @@ function initGame() {
   boss = null; escort = null; dialog = null; transitioning = false;
   wormhole = null; bossWormhole = null; warpState = null; warpDistort = 0; wormholeCD = 0; bgScene = 'space';
   player = mkPlayer(); startMusic(false); advanceLevel();
+  // ocultar barra inferior al iniciar
+  document.getElementById('gamebar')?.classList.add('hidden');
 }
 
 // ── main loop ────────────────────────────────────────────────
@@ -2068,36 +2111,7 @@ player = mkPlayer();
 bullets = []; eBullets = []; enemies = []; particles = []; popups = [];
 requestAnimationFrame(loop);
 
-// ── overlay countdown ─────────────────────────────────────────
-(function() {
-  const overlay  = document.getElementById('adoverlay');
-  const btn      = document.getElementById('ao-btn');
-  const secsEl   = document.getElementById('ao-secs');
-  const prog     = document.getElementById('ao-prog');
-  if (!overlay) return;
-  // empuja el anuncio
-  try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch(e) {}
-  const DELAY = 3000, t0 = performance.now();
-  function tick(now) {
-    const elapsed = Math.min(now - t0, DELAY);
-    prog.style.width = (elapsed / DELAY * 100) + '%';
-    const secs = Math.ceil((DELAY - elapsed) / 1000);
-    if (elapsed < DELAY) {
-      secsEl.textContent = secs;
-      requestAnimationFrame(tick);
-    } else {
-      btn.innerHTML = '¡ JUGAR !';
-      btn.disabled  = false;
-      btn.classList.add('ready');
-    }
-  }
-  requestAnimationFrame(tick);
-  btn.addEventListener('click', () => {
-    if (btn.disabled) return;
-    overlay.style.transition = 'opacity 0.45s';
-    overlay.style.opacity = '0';
-    setTimeout(() => overlay.remove(), 460);
-  });
-})();
+// ── gamebar: inicializar AdSense ─────────────────────────────
+try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch(e) {}
 </script>
 </body></html>
